@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Mesto — фотографии любимых мест и статистика карточек." />
+    <title>Mesto Russia</title>
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <button class="logo-button" id="stats-trigger" type="button" aria-label="Открыть статистику карточек">
+          <img class="logo" src="./src/images/logo.svg" alt="Mesto" />
+          <span class="logo-country">Russia</span>
+        </button>
+      </header>
+
+      <main class="content">
+        <div class="demo-banner" id="demo-banner" role="status" hidden>
+          Предпросмотр: добавь API-данные в <code>.env.local</code>, чтобы загружать карточки с сервера.
+        </div>
+
+        <section class="profile" aria-label="Профиль пользователя">
+          <div class="profile__avatar-wrap">
+            <img class="profile__avatar" id="profile-avatar" src="./src/images/avatar-cousteau.jpg" alt="Аватар пользователя" />
+            <button class="profile__avatar-edit" id="avatar-edit-button" type="button" aria-label="Изменить аватар">
+              <span aria-hidden="true">✎</span>
+            </button>
+          </div>
+          <div class="profile__details">
+            <div class="profile__title-row">
+              <h1 class="profile__name" id="profile-name">Жак-Ив Кусто</h1>
+              <button class="icon-button profile__edit" id="profile-edit-button" type="button" aria-label="Редактировать профиль">
+                <img src="./src/images/edit-button.svg" alt="" />
+              </button>
+            </div>
+            <p class="profile__about" id="profile-about">Исследователь океана</p>
+          </div>
+          <button class="add-button" id="add-card-button" type="button" aria-label="Добавить карточку">
+            <span aria-hidden="true">+</span>
+          </button>
+        </section>
+
+        <section class="cards-section" aria-label="Карточки мест">
+          <ul class="cards" id="cards-list" aria-live="polite"></ul>
+          <p class="empty-state" id="empty-state" hidden>Пока нет карточек. Добавь первую!</p>
+        </section>
+      </main>
+
+      <footer class="footer">© 2025 Mesto Russia</footer>
+    </div>
+
+    <template id="card-template">
+      <li class="card">
+        <div class="card__visual">
+          <img class="card__image" alt="" />
+          <button class="card__info-button" type="button" aria-label="Информация о карточке">
+            <span aria-hidden="true">i</span>
+          </button>
+          <button class="card__delete-button" type="button" aria-label="Удалить карточку">
+            <img src="./src/images/trash.svg" alt="" />
+          </button>
+        </div>
+        <div class="card__caption">
+          <h2 class="card__title"></h2>
+          <button class="card__like-button" type="button" aria-label="Поставить лайк" aria-pressed="false">
+            <svg viewBox="0 0 22 20" aria-hidden="true" focusable="false"><path d="M20.3 1.7a5.8 5.8 0 0 0-8.2 0L11 2.8l-1.1-1.1a5.8 5.8 0 0 0-8.2 8.1L11 19l9.3-9.2a5.8 5.8 0 0 0 0-8.1Z" /></svg>
+            <span class="card__like-count">0</span>
+          </button>
+        </div>
+      </li>
+    </template>
+
+    <template id="stat-row-template">
+      <div class="stat-row">
+        <dt class="stat-row__label"></dt>
+        <dd class="stat-row__value"></dd>
+      </div>
+    </template>
+
+    <template id="stat-chip-template">
+      <li class="stat-chip"></li>
+    </template>
+
+    <div class="popup" id="profile-popup" aria-hidden="true">
+      <div class="popup__container" role="dialog" aria-modal="true" aria-labelledby="profile-popup-title">
+        <button class="popup__close" type="button" data-close aria-label="Закрыть окно">×</button>
+        <h2 class="popup__title" id="profile-popup-title">Редактировать профиль</h2>
+        <form class="form" id="profile-form" novalidate>
+          <label class="form__field">Имя
+            <input class="form__input" name="name" type="text" minlength="2" maxlength="40" required autocomplete="name" />
+          </label>
+          <label class="form__field">О себе
+            <input class="form__input" name="about" type="text" minlength="2" maxlength="200" required />
+          </label>
+          <button class="form__submit" type="submit">Сохранить</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="popup" id="avatar-popup" aria-hidden="true">
+      <div class="popup__container" role="dialog" aria-modal="true" aria-labelledby="avatar-popup-title">
+        <button class="popup__close" type="button" data-close aria-label="Закрыть окно">×</button>
+        <h2 class="popup__title" id="avatar-popup-title">Обновить аватар</h2>
+        <form class="form" id="avatar-form" novalidate>
+          <label class="form__field">Ссылка на изображение
+            <input class="form__input" name="avatar" type="url" placeholder="https://..." required />
+          </label>
+          <button class="form__submit" type="submit">Сохранить</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="popup" id="card-popup" aria-hidden="true">
+      <div class="popup__container" role="dialog" aria-modal="true" aria-labelledby="card-popup-title">
+        <button class="popup__close" type="button" data-close aria-label="Закрыть окно">×</button>
+        <h2 class="popup__title" id="card-popup-title">Новое место</h2>
+        <form class="form" id="card-form" novalidate>
+          <label class="form__field">Название
+            <input class="form__input" name="name" type="text" minlength="2" maxlength="30" required />
+          </label>
+          <label class="form__field">Ссылка на изображение
+            <input class="form__input" name="link" type="url" placeholder="https://..." required />
+          </label>
+          <button class="form__submit" type="submit">Создать</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="popup" id="delete-popup" aria-hidden="true">
+      <div class="popup__container popup__container_type_confirm" role="dialog" aria-modal="true" aria-labelledby="delete-popup-title">
+        <button class="popup__close" type="button" data-close aria-label="Закрыть окно">×</button>
+        <h2 class="popup__title" id="delete-popup-title">Вы уверены?</h2>
+        <p class="popup__description">Карточка будет удалена с сервера.</p>
+        <button class="form__submit" id="delete-confirm-button" type="button">Удалить</button>
+      </div>
+    </div>
+
+    <div class="popup" id="image-popup" aria-hidden="true">
+      <div class="popup__image-container" role="dialog" aria-modal="true" aria-label="Просмотр изображения">
+        <button class="popup__close" type="button" data-close aria-label="Закрыть окно">×</button>
+        <img class="popup__image" id="popup-image" alt="" />
+        <p class="popup__image-caption" id="popup-image-caption"></p>
+      </div>
+    </div>
+
+    <div class="popup" id="card-info-popup" aria-hidden="true">
+      <div class="popup__container popup__container_type_info" role="dialog" aria-modal="true" aria-labelledby="card-info-title">
+        <button class="popup__close" type="button" data-close aria-label="Закрыть окно">×</button>
+        <h2 class="popup__title" id="card-info-title">Информация о карточке</h2>
+        <dl class="stats-list" id="card-info-list"></dl>
+        <h3 class="stats-section-title">Лайкнули:</h3>
+        <ul class="chips-list" id="card-likers-list"></ul>
+      </div>
+    </div>
+
+    <div class="popup" id="stats-popup" aria-hidden="true">
+      <div class="popup__container popup__container_type_stats" role="dialog" aria-modal="true" aria-labelledby="stats-title">
+        <button class="popup__close" type="button" data-close aria-label="Закрыть окно">×</button>
+        <h2 class="popup__title" id="stats-title">Статистика карточек</h2>
+        <dl class="stats-list" id="stats-list"></dl>
+        <h3 class="stats-section-title">Популярные карточки:</h3>
+        <ol class="chips-list" id="popular-cards-list"></ol>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./src/scripts/main.js"></script>
+  </body>
+</html>
