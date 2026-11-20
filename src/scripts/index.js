@@ -2,8 +2,10 @@ import '../styles.css';
 import avatarImage from '../images/avatar-cousteau.jpg';
 import churchImage from '../images/caucasus-church.jpg';
 import churchCropImage from '../images/caucasus-crop.jpg';
-import { api, isApiConfigured } from './api.js';
-import { createCardElement, updateCardLikeState } from './card.js';
+import { api, isApiConfigured } from './components/api.js';
+import { createCardElement, updateCardLikeState } from './components/card.js';
+import { closeModal, initModalListeners, openModal } from './components/modal.js';
+import { enableValidation, refreshSubmitButton, resetFormState, setFormValues, validateForm } from './components/validation.js';
 
 const byId = (id) => document.getElementById(id);
 
@@ -27,6 +29,8 @@ const refs = {
   deleteConfirmButton: byId('delete-confirm-button'),
   toast: byId('toast'),
 };
+enableValidation();
+initModalListeners();
 
 const demoUser = {
   _id: 'demo-owner',
@@ -71,7 +75,6 @@ const demoCards = [
 let currentUser = null;
 let cards = [];
 let pendingDeleteCard = null;
-let activePopup = null;
 let toastTimer = null;
 
 function showToast(message) {
@@ -79,24 +82,6 @@ function showToast(message) {
   refs.toast.classList.add('toast_is-visible');
   window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => refs.toast.classList.remove('toast_is-visible'), 4200);
-}
-
-function openPopup(popup) {
-  if (activePopup && activePopup !== popup) closePopup(activePopup);
-  activePopup = popup;
-  popup.classList.add('popup_is-open');
-  popup.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('page_has-popup');
-  const focusTarget = popup.querySelector('input, button:not([data-close])');
-  window.setTimeout(() => focusTarget?.focus(), 0);
-}
-
-function closePopup(popup = activePopup) {
-  if (!popup) return;
-  popup.classList.remove('popup_is-open');
-  popup.setAttribute('aria-hidden', 'true');
-  if (activePopup === popup) activePopup = null;
-  if (!activePopup) document.body.classList.remove('page_has-popup');
 }
 
 function updateProfileView(user) {
@@ -208,7 +193,7 @@ async function handleStatsClick() {
       renderCards();
     }
     renderStatistics(cards);
-    openPopup(refs.statsPopup);
+    openModal(refs.statsPopup);
   } catch (error) {
     showToast(`Не удалось загрузить статистику: ${error.message}`);
   }
@@ -226,14 +211,14 @@ function openCardInfo(card) {
   refs.cardLikers.replaceChildren();
   if (likes.length === 0) appendChip(refs.cardLikers, 'Пока никто');
   likes.forEach((person) => appendChip(refs.cardLikers, person.name || 'Пользователь'));
-  openPopup(refs.cardInfoPopup);
+  openModal(refs.cardInfoPopup);
 }
 
 function openImagePreview(card) {
   refs.popupImage.src = card.link;
   refs.popupImage.alt = card.name || 'Фотография места';
   refs.popupImageCaption.textContent = card.name || '';
-  openPopup(refs.imagePopup);
+  openModal(refs.imagePopup);
 }
 
 async function handleLike(card, cardElement) {
@@ -253,7 +238,7 @@ async function handleLike(card, cardElement) {
 
 function openDeleteConfirmation(card) {
   pendingDeleteCard = card;
-  openPopup(refs.deletePopup);
+  openModal(refs.deletePopup);
 }
 
 async function runWithButtonState(button, loadingText, action) {
@@ -266,7 +251,11 @@ async function runWithButtonState(button, loadingText, action) {
     showToast(error.message || 'Не удалось выполнить действие. Попробуй ещё раз.');
   } finally {
     button.textContent = originalText;
-    button.disabled = false;
+    if (button.form) {
+      refreshSubmitButton(button.form);
+    } else {
+      button.disabled = false;
+    }
   }
 }
 
@@ -274,7 +263,7 @@ function attachForm(formId, loadingText, action) {
   const form = byId(formId);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (!form.reportValidity()) return;
+    if (!validateForm(form)) return;
     const button = form.querySelector('[type="submit"]');
     void runWithButtonState(button, loadingText, () => action(new FormData(form), form));
   });
@@ -286,16 +275,16 @@ attachForm('profile-form', 'Сохранение...', async (formData, form) => 
     about: String(formData.get('about')).trim(),
   });
   updateProfileView(updatedUser);
-  form.reset();
-  closePopup(byId('profile-popup'));
+  resetFormState(form);
+  closeModal(byId('profile-popup'));
   showToast('Профиль обновлён.');
 });
 
 attachForm('avatar-form', 'Сохранение...', async (formData, form) => {
   const updatedUser = await api.updateAvatar(String(formData.get('avatar')).trim());
   updateProfileView(updatedUser);
-  form.reset();
-  closePopup(byId('avatar-popup'));
+  resetFormState(form);
+  closeModal(byId('avatar-popup'));
   showToast('Аватар обновлён.');
 });
 
@@ -306,8 +295,8 @@ attachForm('card-form', 'Создание...', async (formData, form) => {
   });
   cards.unshift(newCard);
   renderCards();
-  form.reset();
-  closePopup(byId('card-popup'));
+  resetFormState(form);
+  closeModal(byId('card-popup'));
   showToast('Карточка создана.');
 });
 
@@ -318,7 +307,7 @@ refs.deleteConfirmButton.addEventListener('click', () => {
     cards = cards.filter((card) => card._id !== pendingDeleteCard._id);
     pendingDeleteCard = null;
     renderCards();
-    closePopup(refs.deletePopup);
+    closeModal(refs.deletePopup);
     showToast('Карточка удалена.');
   });
 });
@@ -326,26 +315,15 @@ refs.deleteConfirmButton.addEventListener('click', () => {
 byId('stats-trigger').addEventListener('click', () => { void handleStatsClick(); });
 byId('profile-edit-button').addEventListener('click', () => {
   const form = byId('profile-form');
-  form.elements.name.value = currentUser?.name || '';
-  form.elements.about.value = currentUser?.about || '';
-  openPopup(byId('profile-popup'));
+  setFormValues(form, {
+    name: currentUser?.name || '',
+    about: currentUser?.about || '',
+  }, { requireChange: true });
+  openModal(byId('profile-popup'));
 });
-byId('avatar-edit-button').addEventListener('click', () => openPopup(byId('avatar-popup')));
-byId('add-card-button').addEventListener('click', () => openPopup(byId('card-popup')));
+byId('avatar-edit-button').addEventListener('click', () => openModal(byId('avatar-popup')));
+byId('add-card-button').addEventListener('click', () => openModal(byId('card-popup')));
 
-document.querySelectorAll('[data-close]').forEach((button) => {
-  button.addEventListener('click', () => closePopup(button.closest('.popup')));
-});
-
-document.querySelectorAll('.popup').forEach((popup) => {
-  popup.addEventListener('click', (event) => {
-    if (event.target === popup) closePopup(popup);
-  });
-});
-
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && activePopup) closePopup(activePopup);
-});
 
 async function initialize() {
   if (!isApiConfigured) {
